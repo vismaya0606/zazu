@@ -1,0 +1,1977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZAZU ERP</title>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc,
+    doc, onSnapshot, query, orderBy, serverTimestamp, where
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import {
+    getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+    onAuthStateChanged, signOut
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  // ─── PASTE YOUR FIREBASE CONFIG HERE ───────────────────────────────────────
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+  // ───────────────────────────────────────────────────────────────────────────
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+
+  // ── Expose to global scope ──────────────────────────────────────────────────
+  window._fb = { db, auth, collection, addDoc, getDocs, updateDoc, deleteDoc,
+    doc, onSnapshot, query, orderBy, serverTimestamp, where,
+    signInWithEmailAndPassword, createUserWithEmailAndPassword,
+    onAuthStateChanged, signOut };
+
+  // ── Auth State ──────────────────────────────────────────────────────────────
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      document.getElementById('auth-screen').style.display = 'none';
+      document.getElementById('app-shell').style.display = 'flex';
+      document.getElementById('topbar-user').textContent = user.email.split('@')[0].toUpperCase().slice(0,2);
+      loadAllData();
+    } else {
+      document.getElementById('auth-screen').style.display = 'flex';
+      document.getElementById('app-shell').style.display = 'none';
+    }
+  });
+</script>
+
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg: #F7F8FA;
+  --white: #FFFFFF;
+  --sidebar: #0F172A;
+  --sidebar-hover: #1E293B;
+  --sidebar-active: #7C3AED;
+  --accent: #7C3AED;
+  --accent-light: #EDE9FE;
+  --accent2: #F43F5E;
+  --accent2-light: #FFF1F3;
+  --accent3: #10B981;
+  --accent3-light: #D1FAE5;
+  --accent4: #F59E0B;
+  --accent4-light: #FEF3C7;
+  --blue: #3B82F6;
+  --blue-light: #EFF6FF;
+  --text: #1E293B;
+  --text2: #64748B;
+  --text3: #94A3B8;
+  --border: #E2E8F0;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -1px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+  --font: 'Plus Jakarta Sans', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ─── AUTH SCREEN ──────────────────────────────────────────── */
+#auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #0F172A 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+#auth-screen::before {
+  content:'';
+  position:absolute;
+  width:600px; height:600px;
+  background: radial-gradient(circle, rgba(124,58,237,0.3) 0%, transparent 70%);
+  top:-100px; left:-100px;
+  pointer-events:none;
+}
+#auth-screen::after {
+  content:'';
+  position:absolute;
+  width:400px; height:400px;
+  background: radial-gradient(circle, rgba(244,63,94,0.2) 0%, transparent 70%);
+  bottom:-50px; right:-50px;
+  pointer-events:none;
+}
+
+.auth-card {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 48px;
+  width: 420px;
+  position: relative;
+  z-index: 1;
+  animation: slideUp 0.5s ease;
+}
+
+@keyframes slideUp {
+  from { opacity:0; transform:translateY(24px); }
+  to { opacity:1; transform:translateY(0); }
+}
+
+.auth-logo {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.auth-logo-mark {
+  width: 56px; height: 56px;
+  background: linear-gradient(135deg, #7C3AED, #F43F5E);
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 800;
+  color: white;
+  margin-bottom: 16px;
+  box-shadow: 0 8px 32px rgba(124,58,237,0.4);
+}
+
+.auth-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: white;
+  margin-bottom: 4px;
+}
+
+.auth-sub {
+  font-size: 13px;
+  color: rgba(255,255,255,0.5);
+  font-family: var(--mono);
+}
+
+.auth-tabs {
+  display: flex;
+  background: rgba(255,255,255,0.05);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  margin-bottom: 28px;
+}
+
+.auth-tab {
+  flex: 1;
+  text-align: center;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.4);
+  transition: all 0.2s;
+}
+.auth-tab.active {
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 2px 8px rgba(124,58,237,0.4);
+}
+
+.auth-field {
+  margin-bottom: 16px;
+}
+
+.auth-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.5);
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.auth-field input {
+  width: 100%;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  color: white;
+  font-family: var(--font);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.auth-field input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.2);
+}
+.auth-field input::placeholder { color: rgba(255,255,255,0.25); }
+
+.auth-btn {
+  width: 100%;
+  padding: 13px;
+  background: linear-gradient(135deg, #7C3AED, #6D28D9);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+  box-shadow: 0 4px 12px rgba(124,58,237,0.4);
+}
+.auth-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(124,58,237,0.5); }
+
+.auth-error {
+  background: rgba(244,63,94,0.15);
+  border: 1px solid rgba(244,63,94,0.3);
+  color: #FDA4AF;
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 12px;
+  margin-bottom: 16px;
+  display: none;
+}
+
+/* ─── APP SHELL ────────────────────────────────────────────── */
+#app-shell {
+  display: none;
+  min-height: 100vh;
+}
+
+/* ─── SIDEBAR ──────────────────────────────────────────────── */
+.sidebar {
+  width: 240px;
+  min-height: 100vh;
+  background: var(--sidebar);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: fixed;
+  top:0; left:0; bottom:0;
+  z-index: 100;
+  overflow-y: auto;
+}
+
+.sidebar-logo {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-icon {
+  width: 38px; height: 38px;
+  background: linear-gradient(135deg, #7C3AED, #F43F5E);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 15px;
+  color: white;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(124,58,237,0.5);
+}
+
+.logo-text { font-size: 17px; font-weight: 800; color: white; letter-spacing: -0.3px; }
+.logo-sub { font-size: 10px; color: rgba(255,255,255,0.35); font-family: var(--mono); margin-top: 2px; letter-spacing: 1px; }
+
+.nav-section { padding: 20px 12px 8px; }
+
+.nav-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.3);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 0 8px;
+  margin-bottom: 4px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: rgba(255,255,255,0.5);
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: all 0.18s;
+  margin-bottom: 2px;
+  position: relative;
+}
+.nav-item:hover { background: var(--sidebar-hover); color: rgba(255,255,255,0.85); }
+.nav-item.active { background: var(--sidebar-active); color: white; font-weight: 600; box-shadow: 0 2px 8px rgba(124,58,237,0.4); }
+
+.nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+.nav-badge {
+  margin-left: auto;
+  background: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.8);
+  font-size: 10px;
+  font-family: var(--mono);
+  padding: 1px 7px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+.nav-item.active .nav-badge { background: rgba(255,255,255,0.2); }
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 12px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.user-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.user-row:hover { background: var(--sidebar-hover); }
+
+.user-av {
+  width: 34px; height: 34px;
+  background: linear-gradient(135deg, #7C3AED, #F43F5E);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 12px; color: white; flex-shrink: 0;
+}
+.user-name { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.8); }
+.user-role { font-size: 10px; color: rgba(255,255,255,0.35); font-family: var(--mono); }
+
+.sign-out-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.3);
+  cursor: pointer;
+  font-size: 15px;
+  padding: 4px;
+  transition: color 0.2s;
+}
+.sign-out-btn:hover { color: rgba(255,255,255,0.7); }
+
+/* ─── MAIN ─────────────────────────────────────────────────── */
+.main {
+  margin-left: 240px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.topbar {
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.topbar-title { font-size: 17px; font-weight: 800; color: var(--text); }
+.topbar-crumb { font-size: 13px; color: var(--text3); margin-left: 4px; }
+
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+.btn {
+  padding: 8px 18px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.18s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 2px 8px rgba(124,58,237,0.3);
+}
+.btn-primary:hover { background: #6D28D9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,58,237,0.4); }
+
+.btn-outline {
+  background: white;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-outline:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+
+.btn-danger {
+  background: var(--accent2-light);
+  color: var(--accent2);
+  border: 1px solid rgba(244,63,94,0.2);
+}
+.btn-danger:hover { background: var(--accent2); color: white; }
+
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+
+/* ─── CONTENT PAGES ────────────────────────────────────────── */
+.page { padding: 28px; display: none; animation: fadeIn 0.3s ease; }
+.page.active { display: block; }
+
+@keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+
+/* ─── STAT CARDS ───────────────────────────────────────────── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  transition: box-shadow 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.stat-card:hover { box-shadow: var(--shadow-md); }
+
+.stat-card-accent {
+  position: absolute;
+  top: 0; left: 0;
+  width: 4px;
+  height: 100%;
+  border-radius: 12px 0 0 12px;
+}
+
+.stat-icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+
+.stat-label { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.stat-value { font-size: 28px; font-weight: 800; color: var(--text); margin-bottom: 6px; letter-spacing: -0.5px; }
+.stat-change { font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 4px; }
+.up { color: var(--accent3); }
+.down { color: var(--accent2); }
+.neutral { color: var(--text2); }
+
+/* ─── CARDS ────────────────────────────────────────────────── */
+.card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-title { font-size: 14px; font-weight: 700; color: var(--text); }
+.card-body { padding: 20px; }
+
+/* ─── TABLE ────────────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; }
+
+table { width: 100%; border-collapse: collapse; }
+
+thead th {
+  text-align: left;
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+tbody td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+  vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: #FAFBFC; }
+
+/* ─── PILLS ────────────────────────────────────────────────── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.pill-cold    { background: #F1F5F9; color: #64748B; }
+.pill-warm    { background: var(--accent4-light); color: #92400E; }
+.pill-hot     { background: var(--accent2-light); color: #BE123C; }
+.pill-proposal{ background: var(--blue-light); color: #1D4ED8; }
+.pill-negotiation { background: var(--accent-light); color: #5B21B6; }
+.pill-won     { background: var(--accent3-light); color: #065F46; }
+.pill-lost    { background: #FEF2F2; color: #991B1B; }
+
+/* ─── PIPELINE FUNNEL ──────────────────────────────────────── */
+.pipeline-bar {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 24px;
+}
+
+.pipe-seg {
+  height: 8px;
+  border-radius: 4px;
+  transition: all 0.4s ease;
+  cursor: default;
+}
+
+.stage-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.stage-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+  box-shadow: var(--shadow);
+  transition: all 0.2s;
+}
+.stage-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+
+.stage-label { font-size: 10px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.stage-count { font-size: 32px; font-weight: 800; margin-bottom: 4px; letter-spacing: -1px; }
+.stage-val { font-size: 11px; color: var(--text2); font-family: var(--mono); }
+
+/* ─── KANBAN ────────────────────────────────────────────────── */
+.kanban {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.kb-col {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  min-height: 300px;
+}
+
+.kb-head {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+
+.kb-title { font-size: 12px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+.kb-count {
+  background: white;
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--text2);
+  padding: 1px 8px;
+  border-radius: 20px;
+}
+
+.kb-body { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+
+.kcard {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  box-shadow: var(--shadow);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+.kcard:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); border-color: var(--accent); }
+
+.kcard-name { font-size: 13px; font-weight: 700; margin-bottom: 2px; color: var(--text); }
+.kcard-co { font-size: 11px; color: var(--text2); margin-bottom: 8px; }
+.kcard-foot { display: flex; align-items: center; justify-content: space-between; }
+.kcard-val { font-size: 12px; font-family: var(--mono); font-weight: 600; color: var(--accent); }
+.kcard-av {
+  width: 22px; height: 22px; border-radius: 6px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  font-size: 9px; font-weight: 700; color: white;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ─── MODAL ────────────────────────────────────────────────── */
+.overlay {
+  position: fixed; inset:0;
+  background: rgba(15,23,42,0.6);
+  backdrop-filter: blur(6px);
+  z-index: 999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.overlay.open { display: flex; }
+
+.modal {
+  background: white;
+  border-radius: 16px;
+  width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  animation: slideUp 0.3s ease;
+}
+
+.modal-head {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 1;
+}
+
+.modal-title { font-size: 16px; font-weight: 800; }
+
+.modal-close {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg);
+  color: var(--text2);
+  cursor: pointer;
+  font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.18s;
+}
+.modal-close:hover { background: var(--border); }
+
+.modal-body { padding: 24px; }
+
+/* ─── FORM ──────────────────────────────────────────────────── */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-full { grid-column: 1 / -1; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+
+.field input,
+.field select,
+.field textarea {
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 13px;
+  font-family: var(--font);
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+  transition: all 0.18s;
+  width: 100%;
+}
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--accent);
+  background: white;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
+}
+.field textarea { resize: vertical; min-height: 80px; }
+
+.modal-foot {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  position: sticky;
+  bottom: 0;
+  background: white;
+}
+
+/* ─── TOAST ─────────────────────────────────────────────────── */
+.toast-stack {
+  position: fixed;
+  bottom: 24px; right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  background: var(--sidebar);
+  color: white;
+  padding: 12px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--shadow-lg);
+  animation: toastIn 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 240px;
+  pointer-events: all;
+}
+
+@keyframes toastIn {
+  from { opacity:0; transform: translateX(20px); }
+  to { opacity:1; transform: translateX(0); }
+}
+
+.toast.success { border-left: 3px solid var(--accent3); }
+.toast.error { border-left: 3px solid var(--accent2); }
+.toast.info { border-left: 3px solid var(--accent); }
+
+/* ─── ACTIVITY FEED ─────────────────────────────────────────── */
+.feed { display: flex; flex-direction: column; }
+
+.feed-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.feed-item:last-child { border-bottom: none; }
+
+.feed-dot {
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+
+.feed-content { flex: 1; }
+.feed-text { font-size: 13px; line-height: 1.5; }
+.feed-text b { font-weight: 700; }
+.feed-time { font-size: 11px; color: var(--text3); font-family: var(--mono); margin-top: 3px; }
+
+/* ─── TASK LIST ─────────────────────────────────────────────── */
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.task-row:last-child { border-bottom: none; }
+
+.task-cb {
+  width: 18px; height: 18px;
+  border: 2px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.18s;
+}
+.task-cb.done { background: var(--accent3); border-color: var(--accent3); }
+.task-cb.done::after { content:'✓'; font-size: 10px; color: white; font-weight: 700; }
+
+.task-text { flex: 1; font-size: 13px; }
+.task-text.done { text-decoration: line-through; color: var(--text3); }
+.task-due { font-size: 11px; font-family: var(--mono); padding: 2px 8px; border-radius: 20px; }
+.task-due.urgent { background: var(--accent2-light); color: var(--accent2); }
+.task-due.normal { background: var(--bg); color: var(--text2); }
+
+/* ─── EMPTY STATE ───────────────────────────────────────────── */
+.empty {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text3);
+}
+.empty-icon { font-size: 40px; margin-bottom: 12px; }
+.empty-text { font-size: 14px; font-weight: 600; color: var(--text2); margin-bottom: 4px; }
+.empty-sub { font-size: 13px; }
+
+/* ─── LOADING ───────────────────────────────────────────────── */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: var(--text3);
+  gap: 8px;
+  font-size: 13px;
+}
+
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── CHARTS ────────────────────────────────────────────────── */
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 150px;
+  padding-bottom: 24px;
+  position: relative;
+}
+.bar-chart::after {
+  content:'';
+  position: absolute;
+  bottom: 24px; left:0; right:0;
+  height: 1px;
+  background: var(--border);
+}
+
+.bc-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.bc-bars { display: flex; gap: 3px; align-items: flex-end; width: 100%; }
+
+.bc-bar {
+  flex: 1;
+  border-radius: 3px 3px 0 0;
+  min-height: 4px;
+  transition: height 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.bc-label { font-size: 10px; font-family: var(--mono); color: var(--text3); white-space: nowrap; }
+
+/* ─── FUNNEL ────────────────────────────────────────────────── */
+.funnel-viz { display: flex; flex-direction: column; gap: 8px; }
+
+.fv-row { display: flex; align-items: center; gap: 10px; }
+.fv-label { width: 90px; font-size: 11px; color: var(--text2); font-weight: 600; text-align: right; flex-shrink: 0; }
+.fv-track { flex: 1; height: 32px; background: var(--bg); border-radius: 6px; overflow: hidden; position: relative; }
+.fv-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; padding: 0 12px; font-size: 12px; font-weight: 700; color: white; white-space: nowrap; transition: width 0.8s cubic-bezier(0.34,1.56,0.64,1); }
+.fv-num { width: 32px; font-size: 12px; font-family: var(--mono); font-weight: 700; color: var(--text); text-align: right; flex-shrink: 0; }
+
+/* ─── SCROLLBAR ─────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+/* ─── UTILITY ───────────────────────────────────────────────── */
+.flex { display: flex; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.mb-4 { margin-bottom: 16px; }
+.mb-6 { margin-bottom: 24px; }
+.two-col { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+.equal-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.text-muted { color: var(--text2); }
+.text-mono { font-family: var(--mono); }
+.text-sm { font-size: 12px; }
+.fw-bold { font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ AUTH SCREEN ═══════════════════ -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-mark">ZZ</div>
+      <div class="auth-title">ZAZU ERP</div>
+      <div class="auth-sub">DIGITAL MARKETING · CRM</div>
+    </div>
+
+    <div id="auth-error" class="auth-error"></div>
+
+    <div class="auth-tabs">
+      <div class="auth-tab active" onclick="switchTab('login')">Sign In</div>
+      <div class="auth-tab" onclick="switchTab('register')">Register</div>
+    </div>
+
+    <div id="login-form">
+      <div class="auth-field">
+        <label>Email</label>
+        <input type="email" id="login-email" placeholder="you@zazu.com">
+      </div>
+      <div class="auth-field">
+        <label>Password</label>
+        <input type="password" id="login-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button class="auth-btn" onclick="doLogin()">Sign In →</button>
+    </div>
+
+    <div id="register-form" style="display:none">
+      <div class="auth-field">
+        <label>Email</label>
+        <input type="email" id="reg-email" placeholder="you@zazu.com">
+      </div>
+      <div class="auth-field">
+        <label>Password (min 6 chars)</label>
+        <input type="password" id="reg-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doRegister()">
+      </div>
+      <button class="auth-btn" onclick="doRegister()">Create Account →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ APP SHELL ═══════════════════ -->
+<div id="app-shell">
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-wrap">
+        <div class="logo-icon">ZZ</div>
+        <div>
+          <div class="logo-text">ZAZU ERP</div>
+          <div class="logo-sub">DIGITAL MARKETING</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Overview</div>
+      <div class="nav-item active" onclick="nav('dashboard',this)">
+        <span class="nav-icon">⬡</span> Dashboard
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Sales</div>
+      <div class="nav-item" onclick="nav('coldcalls',this)">
+        <span class="nav-icon">📞</span> Cold Calls
+        <span class="nav-badge" id="badge-calls">0</span>
+      </div>
+      <div class="nav-item" onclick="nav('leads',this)">
+        <span class="nav-icon">◎</span> Leads
+        <span class="nav-badge" id="badge-leads">0</span>
+      </div>
+      <div class="nav-item" onclick="nav('pipeline',this)">
+        <span class="nav-icon">▶</span> Pipeline
+      </div>
+      <div class="nav-item" onclick="nav('clients',this)">
+        <span class="nav-icon">★</span> Clients
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Operations</div>
+      <div class="nav-item" onclick="nav('campaigns',this)">
+        <span class="nav-icon">◈</span> Campaigns
+      </div>
+      <div class="nav-item" onclick="nav('tasks',this)">
+        <span class="nav-icon">✓</span> Tasks
+        <span class="nav-badge" id="badge-tasks" style="background:rgba(245,158,11,0.3);color:#F59E0B">0</span>
+      </div>
+      <div class="nav-item" onclick="nav('analytics',this)">
+        <span class="nav-icon">◐</span> Analytics
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="user-row">
+        <div class="user-av" id="topbar-user">?</div>
+        <div>
+          <div class="user-name" id="user-email-display">User</div>
+          <div class="user-role">Sales Team</div>
+        </div>
+        <button class="sign-out-btn" onclick="doSignOut()" title="Sign out">↪</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <span class="topbar-title" id="page-title">Dashboard</span>
+      </div>
+      <div class="topbar-right" id="topbar-actions">
+        <!-- Dynamic buttons injected by nav() -->
+      </div>
+    </div>
+
+    <!-- ════════════════ DASHBOARD ════════════════ -->
+    <div class="page active" id="pg-dashboard">
+      <div class="stat-grid" id="dash-stats">
+        <div class="stat-card">
+          <div class="stat-card-accent" style="background:var(--accent)"></div>
+          <div class="stat-icon" style="background:var(--accent-light)">🎯</div>
+          <div class="stat-label">Total Leads</div>
+          <div class="stat-value" id="d-leads">—</div>
+          <div class="stat-change neutral">All active leads</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-accent" style="background:var(--accent2)"></div>
+          <div class="stat-icon" style="background:var(--accent2-light)">📞</div>
+          <div class="stat-label">Cold Calls</div>
+          <div class="stat-value" id="d-calls">—</div>
+          <div class="stat-change neutral">Total logged</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-accent" style="background:var(--accent3)"></div>
+          <div class="stat-icon" style="background:var(--accent3-light)">🏆</div>
+          <div class="stat-label">Won Deals</div>
+          <div class="stat-value" id="d-won">—</div>
+          <div class="stat-change up" id="d-cr">— conv. rate</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-accent" style="background:var(--accent4)"></div>
+          <div class="stat-icon" style="background:var(--accent4-light)">💰</div>
+          <div class="stat-label">Pipeline Value</div>
+          <div class="stat-value" id="d-value">—</div>
+          <div class="stat-change neutral">Open deals</div>
+        </div>
+      </div>
+
+      <!-- Stage overview -->
+      <div class="stage-row mb-6" id="stage-row">
+        <div class="stage-card"><div class="stage-label">❄ Cold</div><div class="stage-count" id="s-cold" style="color:var(--text2)">—</div></div>
+        <div class="stage-card"><div class="stage-label">🔥 Hot</div><div class="stage-count" id="s-hot" style="color:var(--accent2)">—</div></div>
+        <div class="stage-card"><div class="stage-label">📄 Proposal</div><div class="stage-count" id="s-proposal" style="color:var(--blue)">—</div></div>
+        <div class="stage-card"><div class="stage-label">🖥 Demo</div><div class="stage-count" id="s-demo" style="color:var(--accent)">—</div></div>
+        <div class="stage-card"><div class="stage-label">🤝 Negotiation</div><div class="stage-count" id="s-negotiation" style="color:var(--accent4)">—</div></div>
+        <div class="stage-card"><div class="stage-label">🏆 Won</div><div class="stage-count" id="s-won" style="color:var(--accent3)">—</div></div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Recent Leads</div>
+            <button class="btn btn-outline btn-sm" onclick="nav('leads', document.querySelector('[onclick*=leads]'))">View all →</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>Company</th><th>Stage</th><th>Value</th></tr></thead>
+              <tbody id="dash-recent-leads"><tr><td colspan="4"><div class="loading"><div class="spinner"></div> Loading…</div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Live Activity</div>
+            <span style="width:7px;height:7px;background:var(--accent3);border-radius:50%;display:inline-block;box-shadow:0 0 6px var(--accent3)"></span>
+          </div>
+          <div class="card-body" style="padding:0 16px">
+            <div class="feed" id="dash-feed"><div class="loading"><div class="spinner"></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════ COLD CALLS ════════════════ -->
+    <div class="page" id="pg-coldcalls">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📞 Cold Call Log</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Contact</th><th>Company</th><th>Phone</th>
+                <th>Duration</th><th>Outcome</th><th>Next Action</th>
+                <th>Agent</th><th>Date</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="calls-tbody"><tr><td colspan="9"><div class="loading"><div class="spinner"></div> Loading…</div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════ LEADS ════════════════ -->
+    <div class="page" id="pg-leads">
+      <div class="flex gap-2 mb-4">
+        <input type="text" id="lead-search" placeholder="🔍  Search leads…" oninput="renderLeads()" style="background:white;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:9px 14px;font-family:var(--font);font-size:13px;color:var(--text);outline:none;flex:1;max-width:320px;transition:border-color 0.18s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+        <select id="lead-filter-stage" onchange="renderLeads()" style="background:white;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:9px 14px;font-family:var(--font);font-size:13px;color:var(--text);outline:none;cursor:pointer;">
+          <option value="">All Stages</option>
+          <option>Cold</option><option>Warm</option><option>Hot</option>
+          <option>Proposal</option><option>Demo</option><option>Negotiation</option>
+          <option>Won</option><option>Lost</option>
+        </select>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Name</th><th>Company</th><th>Service</th><th>Stage</th><th>Value</th><th>Owner</th><th>Date</th><th></th></tr>
+            </thead>
+            <tbody id="leads-tbody"><tr><td colspan="8"><div class="loading"><div class="spinner"></div> Loading…</div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════ PIPELINE ════════════════ -->
+    <div class="page" id="pg-pipeline">
+      <div class="kanban" id="kanban-board">
+        <div class="loading"><div class="spinner"></div> Loading…</div>
+      </div>
+    </div>
+
+    <!-- ════════════════ CLIENTS ════════════════ -->
+    <div class="page" id="pg-clients">
+      <div class="stat-grid" id="clients-stats">
+        <div class="stat-card"><div class="stat-card-accent" style="background:var(--accent3)"></div><div class="stat-icon" style="background:var(--accent3-light)">⭐</div><div class="stat-label">Active Clients</div><div class="stat-value" id="c-active">—</div></div>
+        <div class="stat-card"><div class="stat-card-accent" style="background:var(--accent4)"></div><div class="stat-icon" style="background:var(--accent4-light)">💰</div><div class="stat-label">Total MRR</div><div class="stat-value" id="c-mrr">—</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Client Accounts (Won Deals)</div></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Client</th><th>Company</th><th>Service</th><th>Value</th><th>Owner</th><th>Closed</th></tr></thead>
+            <tbody id="clients-tbody"><tr><td colspan="6"><div class="loading"><div class="spinner"></div> Loading…</div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════ CAMPAIGNS ════════════════ -->
+    <div class="page" id="pg-campaigns">
+      <div class="card">
+        <div class="card-header"><div class="card-title">📢 Campaign Tracker</div></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Campaign</th><th>Client</th><th>Channel</th><th>Budget</th><th>Spend</th><th>Leads</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody id="campaigns-tbody"><tr><td colspan="8"><div class="loading"><div class="spinner"></div> Loading…</div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════ TASKS ════════════════ -->
+    <div class="page" id="pg-tasks">
+      <div class="equal-col">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">✓ My Tasks</div>
+          </div>
+          <div class="card-body" style="padding:0 20px">
+            <div id="tasks-list"><div class="loading"><div class="spinner"></div> Loading…</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">📅 Upcoming Follow-Ups</div></div>
+          <div class="card-body" style="padding:0 16px">
+            <div class="feed" id="followups-list"><div class="loading"><div class="spinner"></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════ ANALYTICS ════════════════ -->
+    <div class="page" id="pg-analytics">
+      <div class="stat-grid mb-6" id="ana-stats">
+        <div class="stat-card"><div class="stat-card-accent" style="background:var(--accent)"></div><div class="stat-icon" style="background:var(--accent-light)">📊</div><div class="stat-label">Conv. Rate</div><div class="stat-value" id="a-cr" style="color:var(--accent)">—</div></div>
+        <div class="stat-card"><div class="stat-card-accent" style="background:var(--accent4)"></div><div class="stat-icon" style="background:var(--accent4-light)">💸</div><div class="stat-label">Avg Deal Size</div><div class="stat-value" id="a-avg" style="color:var(--accent4)">—</div></div>
+        <div class="stat-card"><div class="stat-card-accent" style="background:var(--accent3)"></div><div class="stat-icon" style="background:var(--accent3-light)">📞</div><div class="stat-label">Call → Lead Rate</div><div class="stat-value" id="a-clr" style="color:var(--accent3)">—</div></div>
+        <div class="stat-card"><div class="stat-card-accent" style="background:var(--accent2)"></div><div class="stat-icon" style="background:var(--accent2-light)">🏆</div><div class="stat-label">Won Revenue</div><div class="stat-value" id="a-rev" style="color:var(--accent2)">—</div></div>
+      </div>
+      <div class="equal-col mb-6">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Lead Conversion Funnel</div></div>
+          <div class="card-body"><div class="funnel-viz" id="funnel-viz"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Leads by Stage</div></div>
+          <div class="card-body"><div class="bar-chart" id="bar-chart"></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app-shell -->
+
+<!-- ════════════════ MODALS ════════════════ -->
+
+<!-- Lead Modal -->
+<div class="overlay" id="modal-lead">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="lead-modal-title">Add New Lead</div>
+      <button class="modal-close" onclick="closeModal('modal-lead')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="lead-doc-id">
+      <div class="form-grid">
+        <div class="field"><label>Contact Name *</label><input id="f-name" placeholder="Rajesh Mehta"></div>
+        <div class="field"><label>Company *</label><input id="f-company" placeholder="TechNova Pvt Ltd"></div>
+        <div class="field"><label>Phone</label><input id="f-phone" placeholder="+91 98765 43210"></div>
+        <div class="field"><label>Email</label><input id="f-email" type="email" placeholder="rajesh@technova.com"></div>
+        <div class="field"><label>Stage *</label>
+          <select id="f-stage">
+            <option>Cold</option><option>Warm</option><option>Hot</option>
+            <option>Proposal</option><option>Demo</option><option>Negotiation</option>
+            <option>Won</option><option>Lost</option>
+          </select>
+        </div>
+        <div class="field"><label>Assigned To</label><input id="f-owner" placeholder="Priya / Arun / Meena"></div>
+        <div class="field"><label>Service Interest</label>
+          <select id="f-service">
+            <option>SEO</option><option>Google Ads</option><option>Social Media Management</option>
+            <option>Instagram / Facebook Ads</option><option>LinkedIn Marketing</option>
+            <option>Content Marketing</option><option>Website Development</option>
+            <option>Brand Building</option><option>YouTube Ads</option>
+          </select>
+        </div>
+        <div class="field"><label>Est. Value (₹)</label><input id="f-value" type="number" placeholder="150000"></div>
+        <div class="field form-full"><label>Notes / Remarks</label><textarea id="f-notes" placeholder="Key interests, objections, next steps…"></textarea></div>
+        <div class="field"><label>Next Action</label>
+          <select id="f-action">
+            <option>Send Proposal</option><option>Schedule Demo</option><option>Follow-up Call</option>
+            <option>Send Email</option><option>Close Deal</option><option>Archive</option>
+          </select>
+        </div>
+        <div class="field"><label>Follow-Up Date</label><input id="f-followup" type="date"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('modal-lead')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveLead()">💾 Save Lead</button>
+    </div>
+  </div>
+</div>
+
+<!-- Call Modal -->
+<div class="overlay" id="modal-call">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Log Cold Call</div>
+      <button class="modal-close" onclick="closeModal('modal-call')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="call-doc-id">
+      <div class="form-grid">
+        <div class="field"><label>Contact Name *</label><input id="c-name" placeholder="Karthik Rajan"></div>
+        <div class="field"><label>Company</label><input id="c-company" placeholder="Spark Retail"></div>
+        <div class="field"><label>Phone</label><input id="c-phone" placeholder="+91 91234 56789"></div>
+        <div class="field"><label>Agent Name *</label><input id="c-agent" placeholder="Priya / Arun…"></div>
+        <div class="field"><label>Duration (mm:ss)</label><input id="c-duration" placeholder="08:30"></div>
+        <div class="field"><label>Outcome</label>
+          <select id="c-outcome">
+            <option>Interested</option><option>Callback Requested</option>
+            <option>Demo Booked</option><option>Not Interested</option>
+            <option>No Answer</option><option>Voicemail Left</option>
+          </select>
+        </div>
+        <div class="field form-full"><label>Next Action</label><input id="c-action" placeholder="Send proposal / Call back Thu 3PM…"></div>
+        <div class="field form-full"><label>Notes</label><textarea id="c-notes" placeholder="What was discussed?"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('modal-call')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCall()">💾 Save Call</button>
+    </div>
+  </div>
+</div>
+
+<!-- Campaign Modal -->
+<div class="overlay" id="modal-campaign">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">New Campaign</div>
+      <button class="modal-close" onclick="closeModal('modal-campaign')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field form-full"><label>Campaign Name *</label><input id="cm-name" placeholder="Summer Sale Push"></div>
+        <div class="field"><label>Client Name</label><input id="cm-client" placeholder="StyleHub Fashion"></div>
+        <div class="field"><label>Channel</label>
+          <select id="cm-channel">
+            <option>Google Search</option><option>Google Display</option>
+            <option>Facebook / Instagram</option><option>LinkedIn</option>
+            <option>YouTube</option><option>Email Marketing</option><option>SEO</option>
+          </select>
+        </div>
+        <div class="field"><label>Budget (₹)</label><input id="cm-budget" type="number" placeholder="30000"></div>
+        <div class="field"><label>Spend So Far (₹)</label><input id="cm-spend" type="number" placeholder="22000"></div>
+        <div class="field"><label>Leads Generated</label><input id="cm-leads" type="number" placeholder="34"></div>
+        <div class="field"><label>Status</label>
+          <select id="cm-status">
+            <option>Active</option><option>Paused</option><option>Completed</option><option>Draft</option>
+          </select>
+        </div>
+        <div class="field"><label>ROAS (e.g. 4.7)</label><input id="cm-roas" type="number" step="0.1" placeholder="4.7"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('modal-campaign')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCampaign()">💾 Save Campaign</button>
+    </div>
+  </div>
+</div>
+
+<!-- Task Modal -->
+<div class="overlay" id="modal-task">
+  <div class="modal" style="width:420px">
+    <div class="modal-head">
+      <div class="modal-title">Add Task</div>
+      <button class="modal-close" onclick="closeModal('modal-task')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field form-full"><label>Task Description *</label><input id="t-text" placeholder="Follow up with Rajesh Mehta…"></div>
+        <div class="field"><label>Due Date</label><input id="t-due" type="date"></div>
+        <div class="field"><label>Assigned To</label><input id="t-owner" placeholder="Priya / Arun…"></div>
+        <div class="field"><label>Priority</label>
+          <select id="t-priority"><option>Normal</option><option>Urgent</option></select>
+        </div>
+        <div class="field"><label>Linked Lead</label><input id="t-lead" placeholder="Lead name (optional)"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('modal-task')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTask()">💾 Add Task</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-stack" id="toasts"></div>
+
+<!-- ═══════════════════ SCRIPT ═══════════════════ -->
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let _leads = [], _calls = [], _campaigns = [], _tasks = [];
+let _editLeadId = null;
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function fmt(v) {
+  if (!v) return '—';
+  if (v >= 100000) return '₹' + (v/100000).toFixed(1) + 'L';
+  if (v >= 1000) return '₹' + (v/1000).toFixed(0) + 'K';
+  return '₹' + v;
+}
+
+function timeAgo(ts) {
+  if (!ts) return '—';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  const diff = Math.floor((Date.now() - d) / 1000);
+  if (diff < 60) return diff + 's ago';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  return Math.floor(diff/86400) + 'd ago';
+}
+
+function fmtDate(ts) {
+  if (!ts) return '—';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'2-digit' });
+}
+
+function stageClass(s) {
+  const map = { cold:'pill-cold', warm:'pill-warm', hot:'pill-hot', proposal:'pill-proposal', demo:'pill-negotiation', negotiation:'pill-negotiation', won:'pill-won', lost:'pill-lost' };
+  return map[(s||'').toLowerCase()] || 'pill-cold';
+}
+
+function stageEmoji(s) {
+  const m = { cold:'❄', warm:'🌤', hot:'🔥', proposal:'📄', demo:'🖥', negotiation:'🤝', won:'🏆', lost:'❌' };
+  return m[(s||'').toLowerCase()] || '◎';
+}
+
+function toast(msg, type='info') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${type==='success'?'✓':type==='error'?'✗':'ℹ'}</span> ${msg}`;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ── Auth ───────────────────────────────────────────────────────────────────
+function switchTab(t) {
+  document.querySelectorAll('.auth-tab').forEach((el,i) => el.classList.toggle('active', (i===0) === (t==='login')));
+  document.getElementById('login-form').style.display = t==='login' ? '' : 'none';
+  document.getElementById('register-form').style.display = t==='register' ? '' : 'none';
+  document.getElementById('auth-error').style.display = 'none';
+}
+
+async function doLogin() {
+  const { auth, signInWithEmailAndPassword } = window._fb;
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  if (!email || !pass) return showAuthError('Please enter email and password.');
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+  } catch(e) {
+    showAuthError('Login failed: ' + (e.code === 'auth/wrong-password' ? 'Wrong password.' : e.code === 'auth/user-not-found' ? 'No account found.' : e.message));
+  }
+}
+
+async function doRegister() {
+  const { auth, createUserWithEmailAndPassword } = window._fb;
+  const email = document.getElementById('reg-email').value.trim();
+  const pass = document.getElementById('reg-pass').value;
+  if (!email || pass.length < 6) return showAuthError('Enter a valid email and password (min 6 chars).');
+  try {
+    await createUserWithEmailAndPassword(auth, email, pass);
+  } catch(e) {
+    showAuthError('Registration failed: ' + e.message);
+  }
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+async function doSignOut() {
+  await window._fb.signOut(window._fb.auth);
+  toast('Signed out successfully.', 'info');
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+const pageActions = {
+  dashboard: '',
+  coldcalls: `<button class="btn btn-primary" onclick="openCallModal()">+ Log Call</button>`,
+  leads: `<button class="btn btn-primary" onclick="openLeadModal()">+ Add Lead</button>`,
+  pipeline: `<button class="btn btn-primary" onclick="openLeadModal()">+ Add Deal</button>`,
+  clients: '',
+  campaigns: `<button class="btn btn-primary" onclick="openModal('modal-campaign')">+ New Campaign</button>`,
+  tasks: `<button class="btn btn-primary" onclick="openModal('modal-task')">+ Add Task</button>`,
+  analytics: '',
+};
+
+const pageTitles = {
+  dashboard: 'Dashboard', coldcalls: 'Cold Calls', leads: 'Leads',
+  pipeline: 'Pipeline', clients: 'Clients', campaigns: 'Campaigns',
+  tasks: 'Tasks', analytics: 'Analytics'
+};
+
+function nav(page, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('pg-' + page).classList.add('active');
+  if (el) el.classList.add('active');
+  document.getElementById('page-title').textContent = pageTitles[page];
+  document.getElementById('topbar-actions').innerHTML = pageActions[page] || '';
+  if (page === 'pipeline') renderKanban();
+  if (page === 'analytics') renderAnalytics();
+  if (page === 'clients') renderClients();
+  if (page === 'tasks') renderTasks();
+}
+
+// ── Firebase Load ──────────────────────────────────────────────────────────
+async function loadAllData() {
+  const { db, collection, onSnapshot, query, orderBy } = window._fb;
+
+  // Real-time listeners
+  onSnapshot(query(collection(db,'leads'), orderBy('createdAt','desc')), snap => {
+    _leads = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    renderDashboard();
+    renderLeads();
+    document.getElementById('badge-leads').textContent = _leads.filter(l => l.stage !== 'Won' && l.stage !== 'Lost').length;
+  });
+
+  onSnapshot(query(collection(db,'calls'), orderBy('createdAt','desc')), snap => {
+    _calls = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    renderCalls();
+    document.getElementById('badge-calls').textContent = _calls.length;
+  });
+
+  onSnapshot(query(collection(db,'campaigns'), orderBy('createdAt','desc')), snap => {
+    _campaigns = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    renderCampaigns();
+  });
+
+  onSnapshot(query(collection(db,'tasks'), orderBy('createdAt','desc')), snap => {
+    _tasks = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    const pending = _tasks.filter(t => !t.done).length;
+    document.getElementById('badge-tasks').textContent = pending;
+    renderTasks();
+  });
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const active = _leads.filter(l => l.stage !== 'Won' && l.stage !== 'Lost');
+  const won = _leads.filter(l => l.stage === 'Won');
+  const totalVal = active.reduce((s,l) => s + Number(l.value||0), 0);
+  const convRate = _leads.length ? ((won.length / _leads.length)*100).toFixed(1) : 0;
+
+  document.getElementById('d-leads').textContent = active.length;
+  document.getElementById('d-calls').textContent = _calls.length;
+  document.getElementById('d-won').textContent = won.length;
+  document.getElementById('d-value').textContent = fmt(totalVal);
+  document.getElementById('d-cr').textContent = `↑ ${convRate}% conv. rate`;
+
+  const stages = ['Cold','Hot','Proposal','Demo','Negotiation','Won'];
+  stages.forEach(s => {
+    const el = document.getElementById('s-' + s.toLowerCase());
+    if (el) el.textContent = _leads.filter(l => l.stage === s).length;
+  });
+
+  // Recent leads
+  const tbody = document.getElementById('dash-recent-leads');
+  const recent = _leads.slice(0, 6);
+  tbody.innerHTML = recent.length ? recent.map(l => `
+    <tr>
+      <td><div class="fw-bold">${l.name}</div></td>
+      <td class="text-muted">${l.company||'—'}</td>
+      <td><span class="pill ${stageClass(l.stage)}">${stageEmoji(l.stage)} ${l.stage}</span></td>
+      <td class="text-mono" style="color:var(--accent)">${fmt(Number(l.value||0))}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="4"><div class="empty"><div class="empty-icon">🎯</div><div class="empty-text">No leads yet</div><div class="empty-sub">Add your first lead</div></div></td></tr>';
+
+  // Activity feed
+  const feed = document.getElementById('dash-feed');
+  const combined = [
+    ..._leads.slice(0,4).map(l => ({ type:'lead', data:l, ts:l.createdAt })),
+    ..._calls.slice(0,3).map(c => ({ type:'call', data:c, ts:c.createdAt }))
+  ].sort((a,b) => {
+    const at = a.ts?.seconds||0, bt = b.ts?.seconds||0;
+    return bt - at;
+  }).slice(0,7);
+
+  feed.innerHTML = combined.length ? combined.map(item => {
+    if (item.type === 'lead') {
+      return `<div class="feed-item"><div class="feed-dot" style="background:var(--accent-light)">◎</div><div class="feed-content"><div class="feed-text">Lead added: <b>${item.data.name}</b> — ${item.data.company||'Unknown'} <span class="pill ${stageClass(item.data.stage)} text-sm">${item.data.stage}</span></div><div class="feed-time">${timeAgo(item.ts)}</div></div></div>`;
+    } else {
+      return `<div class="feed-item"><div class="feed-dot" style="background:var(--accent2-light)">📞</div><div class="feed-content"><div class="feed-text">Call logged: <b>${item.data.name}</b> — ${item.data.outcome||'Connected'}</div><div class="feed-time">${timeAgo(item.ts)}</div></div></div>`;
+    }
+  }).join('') : '<div class="empty" style="padding:20px"><div class="empty-text">No activity yet</div></div>';
+}
+
+// ── CALLS ─────────────────────────────────────────────────────────────────
+function renderCalls() {
+  const tbody = document.getElementById('calls-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = _calls.length ? _calls.map(c => `
+    <tr>
+      <td><div class="fw-bold">${c.name}</div></td>
+      <td class="text-muted">${c.company||'—'}</td>
+      <td class="text-mono text-sm">${c.phone||'—'}</td>
+      <td class="text-mono">${c.duration||'—'}</td>
+      <td><span class="pill ${c.outcome==='Interested'?'pill-hot':c.outcome==='Demo Booked'?'pill-proposal':c.outcome==='Not Interested'?'pill-lost':'pill-cold'}">${c.outcome||'—'}</span></td>
+      <td class="text-sm text-muted">${c.action||'—'}</td>
+      <td>${c.agent||'—'}</td>
+      <td class="text-sm text-muted">${fmtDate(c.createdAt)}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteDoc('calls','${c.id}')">✕</button></td>
+    </tr>
+  `).join('') : '<tr><td colspan="9"><div class="empty"><div class="empty-icon">📞</div><div class="empty-text">No calls logged yet</div></div></td></tr>';
+}
+
+// ── LEADS ─────────────────────────────────────────────────────────────────
+function renderLeads() {
+  const tbody = document.getElementById('leads-tbody');
+  if (!tbody) return;
+  const search = (document.getElementById('lead-search')?.value||'').toLowerCase();
+  const stage = document.getElementById('lead-filter-stage')?.value||'';
+  let data = _leads;
+  if (search) data = data.filter(l => (l.name+l.company+l.service).toLowerCase().includes(search));
+  if (stage) data = data.filter(l => l.stage === stage);
+
+  tbody.innerHTML = data.length ? data.map(l => `
+    <tr>
+      <td><div class="fw-bold">${l.name}</div><div class="text-sm text-muted">${l.phone||''}</div></td>
+      <td>${l.company||'—'}</td>
+      <td class="text-sm text-muted">${l.service||'—'}</td>
+      <td><span class="pill ${stageClass(l.stage)}">${stageEmoji(l.stage)} ${l.stage}</span></td>
+      <td class="text-mono" style="color:var(--accent)">${fmt(Number(l.value||0))}</td>
+      <td>${l.owner||'—'}</td>
+      <td class="text-sm text-muted">${fmtDate(l.createdAt)}</td>
+      <td>
+        <div class="flex gap-2">
+          <button class="btn btn-outline btn-sm" onclick="editLead('${l.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteDoc('leads','${l.id}')">✕</button>
+        </div>
+      </td>
+    </tr>
+  `).join('') : '<tr><td colspan="8"><div class="empty"><div class="empty-icon">◎</div><div class="empty-text">No leads found</div></div></td></tr>';
+}
+
+// ── PIPELINE KANBAN ────────────────────────────────────────────────────────
+function renderKanban() {
+  const board = document.getElementById('kanban-board');
+  const stages = [
+    { key:'Cold', color:'var(--text2)' },
+    { key:'Warm', color:'var(--accent4)' },
+    { key:'Hot', color:'var(--accent2)' },
+    { key:'Proposal', color:'var(--blue)' },
+    { key:'Negotiation', color:'var(--accent)' },
+    { key:'Won', color:'var(--accent3)' },
+  ];
+
+  board.innerHTML = stages.map(s => {
+    const cards = _leads.filter(l => l.stage === s.key);
+    return `
+      <div class="kb-col">
+        <div class="kb-head">
+          <div class="kb-title" style="color:${s.color}">${stageEmoji(s.key)} ${s.key}</div>
+          <div class="kb-count">${cards.length}</div>
+        </div>
+        <div class="kb-body">
+          ${cards.length ? cards.map(l => `
+            <div class="kcard" onclick="editLead('${l.id}')">
+              <div class="kcard-name">${l.name}</div>
+              <div class="kcard-co">${l.company||'—'}</div>
+              <div class="kcard-foot">
+                <div class="kcard-val">${fmt(Number(l.value||0))}</div>
+                <div class="kcard-av">${(l.owner||'?').slice(0,1).toUpperCase()}</div>
+              </div>
+            </div>
+          `).join('') : '<div style="padding:16px;text-align:center;color:var(--text3);font-size:12px;">Empty</div>'}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── CLIENTS ────────────────────────────────────────────────────────────────
+function renderClients() {
+  const wonLeads = _leads.filter(l => l.stage === 'Won');
+  const totalMRR = wonLeads.reduce((s,l) => s + Number(l.value||0), 0);
+
+  document.getElementById('c-active').textContent = wonLeads.length;
+  document.getElementById('c-mrr').textContent = fmt(totalMRR);
+
+  const tbody = document.getElementById('clients-tbody');
+  tbody.innerHTML = wonLeads.length ? wonLeads.map(l => `
+    <tr>
+      <td><div class="fw-bold">${l.name}</div><div class="text-sm text-muted">${l.email||''}</div></td>
+      <td>${l.company||'—'}</td>
+      <td class="text-sm">${l.service||'—'}</td>
+      <td class="text-mono" style="color:var(--accent3)">${fmt(Number(l.value||0))}</td>
+      <td>${l.owner||'—'}</td>
+      <td class="text-sm text-muted">${fmtDate(l.createdAt)}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="6"><div class="empty"><div class="empty-icon">⭐</div><div class="empty-text">No won deals yet</div><div class="empty-sub">Close some leads to see clients here</div></div></td></tr>';
+}
+
+// ── CAMPAIGNS ─────────────────────────────────────────────────────────────
+function renderCampaigns() {
+  const tbody = document.getElementById('campaigns-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = _campaigns.length ? _campaigns.map(c => `
+    <tr>
+      <td class="fw-bold">${c.name}</td>
+      <td class="text-muted">${c.client||'—'}</td>
+      <td class="text-sm">${c.channel||'—'}</td>
+      <td class="text-mono">${fmt(Number(c.budget||0))}</td>
+      <td class="text-mono">${fmt(Number(c.spend||0))}</td>
+      <td class="text-mono" style="color:var(--accent3)">${c.leads||0}</td>
+      <td><span class="pill ${c.status==='Active'?'pill-won':c.status==='Completed'?'pill-cold':'pill-warm'}">${c.status||'Active'}</span></td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteDoc('campaigns','${c.id}')">✕</button></td>
+    </tr>
+  `).join('') : '<tr><td colspan="8"><div class="empty"><div class="empty-icon">◈</div><div class="empty-text">No campaigns yet</div></div></td></tr>';
+}
+
+// ── TASKS ──────────────────────────────────────────────────────────────────
+function renderTasks() {
+  const list = document.getElementById('tasks-list');
+  if (!list) return;
+  const today = new Date().toISOString().split('T')[0];
+
+  list.innerHTML = _tasks.length ? _tasks.map(t => `
+    <div class="task-row">
+      <div class="task-cb ${t.done?'done':''}" onclick="toggleTask('${t.id}', ${!t.done})"></div>
+      <div class="task-text ${t.done?'done':''}">${t.text}</div>
+      <span class="task-due ${t.due && t.due <= today && !t.done ? 'urgent':'normal'}">${t.due||'No date'}</span>
+      <button class="btn btn-danger btn-sm" onclick="deleteDoc('tasks','${t.id}')">✕</button>
+    </div>
+  `).join('') : '<div class="empty"><div class="empty-icon">✓</div><div class="empty-text">All clear!</div><div class="empty-sub">No tasks pending</div></div>';
+
+  // Follow-ups from leads
+  const fl = document.getElementById('followups-list');
+  if (!fl) return;
+  const fu = _leads.filter(l => l.followup).sort((a,b)=> a.followup > b.followup ? 1:-1).slice(0,6);
+  fl.innerHTML = fu.length ? fu.map(l => `
+    <div class="feed-item">
+      <div class="feed-dot" style="background:var(--accent-light)">📅</div>
+      <div class="feed-content">
+        <div class="feed-text"><b>${l.action||'Follow up'}</b>: ${l.name} — ${l.company||''}</div>
+        <div class="feed-time">${l.followup}</div>
+      </div>
+    </div>
+  `).join('') : '<div class="empty" style="padding:20px"><div class="empty-text">No follow-ups scheduled</div></div>';
+}
+
+// ── ANALYTICS ─────────────────────────────────────────────────────────────
+function renderAnalytics() {
+  const won = _leads.filter(l => l.stage==='Won');
+  const cr = _leads.length ? ((won.length/_leads.length)*100).toFixed(1)+'%' : '—';
+  const wonVals = won.map(l=>Number(l.value||0));
+  const avgDeal = won.length ? fmt(Math.round(wonVals.reduce((a,b)=>a+b,0)/won.length)) : '—';
+  const totalRev = fmt(wonVals.reduce((a,b)=>a+b,0));
+  const clr = _calls.length ? ((_leads.length/_calls.length)*100).toFixed(0)+'%' : '—';
+
+  document.getElementById('a-cr').textContent = cr;
+  document.getElementById('a-avg').textContent = avgDeal;
+  document.getElementById('a-clr').textContent = clr;
+  document.getElementById('a-rev').textContent = totalRev;
+
+  // Funnel
+  const stages = ['Cold','Warm','Hot','Proposal','Demo','Negotiation','Won'];
+  const funnelColors = ['#94A3B8','#F59E0B','#F43F5E','#3B82F6','#7C3AED','#A78BFA','#10B981'];
+  const counts = stages.map(s => _leads.filter(l=>l.stage===s).length);
+  const maxCount = Math.max(...counts, 1);
+
+  document.getElementById('funnel-viz').innerHTML = stages.map((s,i) => `
+    <div class="fv-row">
+      <div class="fv-label">${stageEmoji(s)} ${s}</div>
+      <div class="fv-track">
+        <div class="fv-fill" style="width:${(counts[i]/maxCount)*100}%;background:${funnelColors[i]}">${counts[i]>0?counts[i]+' leads':''}</div>
+      </div>
+      <div class="fv-num">${counts[i]}</div>
+    </div>
+  `).join('');
+
+  // Bar chart
+  const chart = document.getElementById('bar-chart');
+  chart.innerHTML = stages.map((s,i) => `
+    <div class="bc-group">
+      <div class="bc-bars">
+        <div class="bc-bar" style="height:${(counts[i]/maxCount)*110}px;background:${funnelColors[i]};opacity:0.85"></div>
+      </div>
+      <div class="bc-label">${s.slice(0,3)}</div>
+    </div>
+  `).join('');
+}
+
+// ── MODALS ─────────────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('overlay')) e.target.classList.remove('open');
+});
+
+function openLeadModal() {
+  _editLeadId = null;
+  document.getElementById('lead-modal-title').textContent = 'Add New Lead';
+  ['name','company','phone','email','notes','owner','action','followup','value'].forEach(f => {
+    const el = document.getElementById('f-'+f);
+    if (el) el.value = '';
+  });
+  document.getElementById('f-stage').value = 'Cold';
+  openModal('modal-lead');
+}
+
+function editLead(id) {
+  const l = _leads.find(x=>x.id===id);
+  if (!l) return;
+  _editLeadId = id;
+  document.getElementById('lead-modal-title').textContent = 'Edit Lead';
+  document.getElementById('f-name').value = l.name||'';
+  document.getElementById('f-company').value = l.company||'';
+  document.getElementById('f-phone').value = l.phone||'';
+  document.getElementById('f-email').value = l.email||'';
+  document.getElementById('f-stage').value = l.stage||'Cold';
+  document.getElementById('f-owner').value = l.owner||'';
+  document.getElementById('f-service').value = l.service||'SEO';
+  document.getElementById('f-value').value = l.value||'';
+  document.getElementById('f-notes').value = l.notes||'';
+  document.getElementById('f-action').value = l.action||'Send Proposal';
+  document.getElementById('f-followup').value = l.followup||'';
+  openModal('modal-lead');
+}
+
+function openCallModal() {
+  ['name','company','phone','agent','duration','action','notes'].forEach(f=>{
+    const el=document.getElementById('c-'+f); if(el) el.value='';
+  });
+  document.getElementById('c-outcome').value='Interested';
+  openModal('modal-call');
+}
+
+// ── SAVE OPERATIONS ────────────────────────────────────────────────────────
+async function saveLead() {
+  const { db, collection, addDoc, updateDoc, doc, serverTimestamp } = window._fb;
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) return toast('Name is required!', 'error');
+
+  const data = {
+    name,
+    company: document.getElementById('f-company').value.trim(),
+    phone: document.getElementById('f-phone').value.trim(),
+    email: document.getElementById('f-email').value.trim(),
+    stage: document.getElementById('f-stage').value,
+    owner: document.getElementById('f-owner').value.trim(),
+    service: document.getElementById('f-service').value,
+    value: document.getElementById('f-value').value||0,
+    notes: document.getElementById('f-notes').value.trim(),
+    action: document.getElementById('f-action').value,
+    followup: document.getElementById('f-followup').value,
+  };
+
+  try {
+    if (_editLeadId) {
+      await updateDoc(doc(db,'leads',_editLeadId), data);
+      toast('Lead updated! ✓', 'success');
+    } else {
+      data.createdAt = serverTimestamp();
+      await addDoc(collection(db,'leads'), data);
+      toast('Lead saved! ✓', 'success');
+    }
+    closeModal('modal-lead');
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+async function saveCall() {
+  const { db, collection, addDoc, serverTimestamp } = window._fb;
+  const name = document.getElementById('c-name').value.trim();
+  if (!name) return toast('Contact name is required!', 'error');
+  try {
+    await addDoc(collection(db,'calls'), {
+      name,
+      company: document.getElementById('c-company').value.trim(),
+      phone: document.getElementById('c-phone').value.trim(),
+      agent: document.getElementById('c-agent').value.trim(),
+      duration: document.getElementById('c-duration').value.trim(),
+      outcome: document.getElementById('c-outcome').value,
+      action: document.getElementById('c-action').value.trim(),
+      notes: document.getElementById('c-notes').value.trim(),
+      createdAt: serverTimestamp()
+    });
+    toast('Call logged! ✓', 'success');
+    closeModal('modal-call');
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+async function saveCampaign() {
+  const { db, collection, addDoc, serverTimestamp } = window._fb;
+  const name = document.getElementById('cm-name').value.trim();
+  if (!name) return toast('Campaign name required!', 'error');
+  try {
+    await addDoc(collection(db,'campaigns'), {
+      name,
+      client: document.getElementById('cm-client').value.trim(),
+      channel: document.getElementById('cm-channel').value,
+      budget: document.getElementById('cm-budget').value||0,
+      spend: document.getElementById('cm-spend').value||0,
+      leads: document.getElementById('cm-leads').value||0,
+      status: document.getElementById('cm-status').value,
+      roas: document.getElementById('cm-roas').value||0,
+      createdAt: serverTimestamp()
+    });
+    toast('Campaign saved! ✓', 'success');
+    closeModal('modal-campaign');
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+async function saveTask() {
+  const { db, collection, addDoc, serverTimestamp } = window._fb;
+  const text = document.getElementById('t-text').value.trim();
+  if (!text) return toast('Task description required!', 'error');
+  try {
+    await addDoc(collection(db,'tasks'), {
+      text,
+      due: document.getElementById('t-due').value,
+      owner: document.getElementById('t-owner').value.trim(),
+      priority: document.getElementById('t-priority').value,
+      lead: document.getElementById('t-lead').value.trim(),
+      done: false,
+      createdAt: serverTimestamp()
+    });
+    toast('Task added! ✓', 'success');
+    closeModal('modal-task');
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+async function toggleTask(id, done) {
+  const { db, doc, updateDoc } = window._fb;
+  try {
+    await updateDoc(doc(db,'tasks',id), { done });
+  } catch(e) {
+    toast('Error: '+e.message, 'error');
+  }
+}
+
+async function deleteDoc(col, id) {
+  if (!confirm('Delete this record? This cannot be undone.')) return;
+  const { db, doc, deleteDoc: fbDelete } = window._fb;
+  try {
+    await fbDelete(doc(db,col,id));
+    toast('Deleted successfully.', 'info');
+  } catch(e) {
+    toast('Error: '+e.message, 'error');
+  }
+}
+
+// Set user display
+window.addEventListener('DOMContentLoaded', () => {
+  const today = new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+});
+</script>
+</body>
+</html>
